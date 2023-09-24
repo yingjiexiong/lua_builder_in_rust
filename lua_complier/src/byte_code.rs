@@ -6,6 +6,7 @@ pub enum ByteCode {
     LoadNil(u8),
     LoadBool(u8, bool),
     LoadInt(u8, i16),
+    Move(u8,u8),
 }
 
 

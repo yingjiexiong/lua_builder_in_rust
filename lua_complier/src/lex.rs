@@ -42,7 +42,7 @@ impl Lex {
            '\0' => Token::Eos,
            '('=>Token::ParL,
            ')'=>Token::ParR,
-
+           '='=>Token::Assign, 
            '"' => {
                 let mut s = String::new();
                 loop {
@@ -93,6 +93,9 @@ impl Lex {
         } 
         match &s as &str {
             "nil"=>Token::Nil,
+            "true"=>Token::True,
+            "false"=>Token::False,
+            "local"=>Token::Local,
             _=>Token::Name(s),
         }
 
@@ -102,8 +105,12 @@ impl Lex {
 
       /*decima */
       loop {
-         if let Some(num1) = self.read_char().to_digit(10){
+         let ch = self.read_char();
+         if let Some(num1) = ch.to_digit(10){
             num = num * 10 + num1 as i64;
+         }
+         else if ch == '.'{
+          return self.read_digit_fraction(num); 
          }
          else{
           self.pullback_char();
@@ -114,4 +121,25 @@ impl Lex {
       Token::Integer(num)
    }
 
+   fn read_digit_fraction(&mut self,n:i64)->Token{
+      let mut num_i:i64 = 0;
+      let mut x = 1.0;
+      loop {
+        let ch = self.read_char();
+        if let Some(num1) = ch.to_digit(10){
+          num_i = num_i * 10 + num1 as i64; 
+          x *=  10.0;
+        }      
+        else{
+          self.pullback_char();
+          break;
+        }
+
+      }
+      let  num_f = num_i as f64 / x;
+      dbg!(&n);
+      dbg!(&(num_i));
+      dbg!(&num_f);
+      Token::Float(n as f64 + num_f)
+   }
 }

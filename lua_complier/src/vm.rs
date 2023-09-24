@@ -8,6 +8,7 @@ use crate::{value::Value, parse::ParseProto, byte_code::ByteCode};
 pub struct  ExeState {
    globals: HashMap<String,Value>,
    stack: Vec::<Value>, 
+   func_index :usize,
 }
 
 
@@ -16,7 +17,7 @@ impl ExeState {
       let mut globals = HashMap::new();
       globals.insert(String::from("print"), Value::Function(lib_print));
 
-      ExeState { globals, stack: Vec::new() ,}
+      ExeState { globals, stack: Vec::new(), func_index:0,}
    }
    
    pub fn execute(&mut self,proto:&ParseProto) {
@@ -44,13 +45,18 @@ impl ExeState {
         ByteCode::LoadBool(dst, bol) => self.set_stack(dst, Value::Boolean(bol)),
         ByteCode::LoadInt(dst, i) => self.set_stack(dst, Value::Integer(i.into())),
         ByteCode::Call(func, _) => {
-            let func = &self.stack[func as usize];
+            self.func_index = func as usize;
+            let func = &self.stack[self.func_index];
             if let Value::Function(f) = func{
                f(self);
             }
             else {
                 panic!("invalid function: {func:?}");
             }
+        }
+        ByteCode::Move(dst, ic) => {
+          let v = self.stack[ic as usize].clone();
+          self.set_stack(dst, v)
         }
       }
     }
@@ -68,7 +74,7 @@ impl ExeState {
 
 
 fn lib_print(state: &mut ExeState) -> i32{
-   println!("{:?}",state.stack[1]);
+   println!("{:?}",state.stack[state.func_index + 1]);
    0
 }
 
