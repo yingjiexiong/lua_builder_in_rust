@@ -49,7 +49,6 @@ pub fn load(input:File)->ParseProto{
     }
     dbg!(&constants);
     dbg!(&byte_codes);
-    // dbg!(&locals);
     ParseProto { constants, byte_codes }
 }
 
@@ -115,9 +114,8 @@ fn function_call(byte_codes: &mut Vec<ByteCode>,
                  ){
   let ifunc = locals.len();
   let iarg = ifunc + 1;
-  let ic = add_const(constants,Value::String(name));
-  byte_codes.push(ByteCode::GetGlobal(0, ic as u8));
-
+  let code = load_var(constants, locals, ifunc, name);
+  byte_codes.push(code);
   match lex.next() {
       Token::ParL =>{
           let code = match lex.next() {
@@ -130,10 +128,10 @@ fn function_call(byte_codes: &mut Vec<ByteCode>,
                       ByteCode::LoadInt(1,ii)
                   }
                   else{
-                      load_const(constants,1,Value::Integer(i))
+                      load_const(constants,iarg,Value::Integer(i))
                   }
-              Token::Float(f) => load_const(constants,1,Value::Float(f)),
-              Token::Strng(s) => load_const(constants,1,Value::String(s)),
+              Token::Float(f) => load_const(constants,iarg,Value::Float(f)),
+              Token::Strng(s) => load_const(constants,iarg,Value::String(s)),
               Token::Name(var)=> load_var(constants, &locals, iarg, var),
               _=> panic!("invalid argument"),
           };
@@ -151,6 +149,6 @@ fn function_call(byte_codes: &mut Vec<ByteCode>,
       _=>panic!("expectd string"),
   }
 
-  byte_codes.push(ByteCode::Call(0, 1));
+  byte_codes.push(ByteCode::Call(ifunc as u8, 1));
 
 }
