@@ -1,6 +1,6 @@
 use std::fs::File;
 
-use crate::{value::Value, byte_code::ByteCode, lex::{Lex, Token}};
+use crate::{value::{Value, self}, byte_code::ByteCode, lex::{Lex, Token}};
 
 
 
@@ -38,12 +38,12 @@ fn chunk(&mut self){
         match self.lex.next() {
 
            Token::Name(name) =>{
-              // if lex.next() == Token::Assign{
-              //   assignment(&mut byte_codes, &mut constants, &locals, &mut lex, name)
-              // }
-              // else{
+              if self.lex.peek() == &Token::Assign{
+
+              }
+              else {
                 self.function_call( name)
-              // }
+              }
            }
            Token::Local=>{
                 let var = if let Token::Name(var) = self.lex.next(){
@@ -115,6 +115,9 @@ fn load_exp(&mut self) {
     let code = match self.lex.next() {
        Token::Strng(s)=>self.load_const(self.locals.len(), Value::String(s)),
        Token::Name(var)=>self.load_var(self.locals.len(),var),
+       Token::Integer(i)=>self.load_const(self.locals.len(), Value::Integer(i)),
+       Token::True=>ByteCode::LoadBool(self.locals.len() as u8, true),
+       Token::False=>ByteCode::LoadBool(self.locals.len() as u8, false),
        _=>panic!("invalid argument"),
     };
     self.byte_codes.push(code);

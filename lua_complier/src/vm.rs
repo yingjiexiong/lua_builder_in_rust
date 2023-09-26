@@ -58,6 +58,7 @@ impl ExeState {
           let v = self.stack[ic as usize].clone();
           self.set_stack(dst, v)
         }
+        _=>panic!("expected byte code"),
       }
     }
    } 

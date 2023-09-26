@@ -1,4 +1,4 @@
-local a = "hello local"
+local a = false
 local b = a
 print(b)
 print(print)

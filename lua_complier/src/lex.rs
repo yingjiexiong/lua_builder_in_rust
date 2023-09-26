@@ -1,8 +1,9 @@
-use std::{fs::File, io::{Read, Seek}};
+use std::{fs::File, io::{Read, Seek}, mem};
 
 #[derive(Debug)]
 pub struct Lex{
     input: File,
+    head:Token,
 }
 #[derive(Debug,PartialEq)]
 pub enum Token {
@@ -32,9 +33,26 @@ pub enum Token {
 
 impl Lex {
    pub fn new(input : File) ->Self{
-       Lex { input, } 
+       Lex { input,
+             head:Token::Eos } 
    }
-   pub fn next(&mut self)->Token {
+   pub fn next(&mut self)->Token{
+        if self.head == Token::Eos{
+            self.do_next()
+        }
+        else{
+            mem::replace(&mut self.head, Token::Eos)
+        }
+   }
+
+   pub fn peek(&mut self)->&Token {
+    // this function can use Some(x).take() to instead
+      if self.head == Token::Eos{
+        self.head = self.do_next();
+      } 
+      &self.head
+   }
+   fn do_next(&mut self)->Token {
 
         let ch = self.read_char();
         match ch {
