@@ -1,6 +1,12 @@
-local a = false
-local b = a
-print(b)
-print(print)
-local print = print
-print("im local print")
+local a = 123
+print(a)
+a = a
+print(a)
+a = g
+print(a)
+g = 123
+print(g)
+g = a
+print(g)
+g = g2
+print(g)
