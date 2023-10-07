@@ -1,7 +1,11 @@
 
 use core::fmt;
+// use std::rc::Rc;
 
 use crate::vm::ExeState;
+
+// const SHORT_STR_MAX: usize=14;
+// const MID_STR_MAX: usize = 48 - 1;
 
 
 #[derive(Clone)]
@@ -12,6 +16,9 @@ pub enum Value {
    Float(f64),
    String(String) ,
    Function(fn (&mut ExeState)-> i32),
+   // ShortStr(u8,[u8;SHORT_STR_MAX]),
+   // MidStr(Rc<(u8,[u8;MID_STR_MAX])>),
+   // LongStr(Rc<Vec<u8>>),
 }
 
 
@@ -24,6 +31,9 @@ impl fmt::Debug for Value{
          Value::Boolean(b) => write!(f,"{b}"),
          Value::Integer(i) => write!(f,"{i}"),
          Value::Float(n) => write!(f,"{n:?}"),
+         // Value::ShortStr(_, _) => todo!(),
+         // Value::MidStr(_) => todo!(),
+         // Value::LongStr(_) => todo!(),
       }
    }
 }
@@ -41,3 +51,23 @@ impl PartialEq for Value {
         }
     }
 }
+
+// impl From<String> for Value {
+//    fn from(value: String) -> Self {
+//        let len = value.len();
+//        if len <= SHORT_STR_MAX{
+//             // len [0..14]
+//             let mut buf = [0;SHORT_STR_MAX];
+//             buf[..len].copy_from_slice(value.as_bytes());
+//             Value::ShortStr(len as u8,buf)
+//        }
+//        else if len <= MID_STR_MAX {
+//             let mut buf = [0;MID_STR_MAX];
+//             buf[..len].copy_from_slice(value.as_bytes());
+//             Value::MidStr(Rc::new((len as u8,buf)))
+//        }
+//        else {
+//             Value::LongStr(Rc::new(value.into())) 
+//        }
+//    } 
+// }

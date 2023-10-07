@@ -27,7 +27,7 @@ impl ParseProto {
     print!("proto.constants : {:?}",&proto.constants);
     println!("proto.byte_codes :");
     for i in proto.byte_codes.iter(){
-      println!("{:?}",&i);
+      println!("{:?}",i);
     }
     proto
 }
@@ -45,25 +45,28 @@ fn chunk(&mut self){
                 self.function_call( name)
               }
            }
-           Token::Local=>{
-                let var = if let Token::Name(var) = self.lex.next(){
-                  var
-                }
-                else{
-                  panic!("expected variable");
-                };
-                
-                if self.lex.next() != Token::Assign {
-                  panic!("expected '=' ");
-                }
-                self.load_exp(self.locals.len());
-                self.locals.push(var);
-
-           }
+           Token::Local=> self.local(),
            Token::Eos=>break,
            t => panic!("unexpected token: {t:?}"),
         }
     }
+}
+
+fn local(&mut self){
+
+  let var = if let Token::Name(var) = self.lex.next(){
+    var
+  }
+  else{
+    panic!("expected variable");
+  };
+  
+  if self.lex.next() != Token::Assign {
+    panic!("expected '=' ");
+  }
+  self.load_exp(self.locals.len());
+  self.locals.push(var);
+
 }
 
 fn function_call(&mut self,
@@ -75,25 +78,7 @@ fn function_call(&mut self,
   self.byte_codes.push(code);
   match self.lex.next() {
       Token::ParL =>{
-          let code = match self.lex.next() {
-              Token::Nil   =>  ByteCode::LoadNil(1),
-              Token::True  =>  ByteCode::LoadBool(1,true),
-              Token::False =>  ByteCode::LoadBool(1,false),
-              Token::Integer(i)=> 
-                  // <= 2byte
-                  if let Ok(ii) = i16::try_from(i){
-                      ByteCode::LoadInt(1,ii)
-                  }
-                  else{
-                      self.load_const(iarg,Value::Integer(i))
-                  }
-              Token::Float(f) => self.load_const(iarg,Value::Float(f)),
-              Token::Strng(s) => self.load_const(iarg,Value::String(s)),
-              Token::Name(var)=> self.load_var(iarg, var),
-              _=> panic!("invalid argument"),
-          };
-          self.byte_codes.push(code);
-
+          self.load_exp(iarg);
           if self.lex.next() != Token::ParR{
               panic!("expected ')'");
           }
@@ -115,21 +100,26 @@ fn load_exp(&mut self, dst: usize) {
     let code = match self.lex.next() {
        Token::Strng(s)=>self.load_const(dst, Value::String(s)),
        Token::Name(var)=>self.load_var(dst,var),
-       Token::Integer(i)=>self.load_const(dst, Value::Integer(i)),
+       Token::Integer(i)=>{
+          if let Ok(ii)=i16::try_from(i) {
+            ByteCode::LoadInt(dst as u8, ii)
+          }
+          else{
+            self.load_const(dst, Value::Integer(i))
+          }
+       }
        Token::True=>ByteCode::LoadBool(dst as u8, true),
        Token::False=>ByteCode::LoadBool(dst as u8, false),
+       Token::Float(f)=>self.load_const(dst, Value::Float(f)),
        _=>panic!("invalid argument"),
     };
     self.byte_codes.push(code);
-
 }
 
 fn load_var(&mut self,
             dst: usize, 
             name: String) -> ByteCode {
-    if let Some(i) = self.locals
-                                .iter()
-                                .rposition(|v| v==&name){
+    if let Some(i) = self.get_local(&name){
       // local variable
       ByteCode::Move(dst as u8,i as u8)
     }
