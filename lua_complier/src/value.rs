@@ -16,9 +16,9 @@ pub enum Value {
    Float(f64),
    String(String) ,
    Function(fn (&mut ExeState)-> i32),
-   // ShortStr(u8,[u8;SHORT_STR_MAX]),
-   // MidStr(Rc<(u8,[u8;MID_STR_MAX])>),
-   // LongStr(Rc<Vec<u8>>),
+  //  ShortStr(u8,[u8;SHORT_STR_MAX]),
+  //  MidStr(Rc<(u8,[u8;MID_STR_MAX])>),
+  //  LongStr(Rc<Vec<u8>>),
 }
 
 
@@ -26,14 +26,14 @@ impl fmt::Debug for Value{
    fn fmt(&self,f:&mut fmt::Formatter) ->Result<( ), fmt::Error>{
       match self{
          Value::Nil=>write!(f,"nil"),
-         Value::String(s) => write!(f, "{s}"),
          Value::Function(_)=>write!(f,"function"),
          Value::Boolean(b) => write!(f,"{b}"),
          Value::Integer(i) => write!(f,"{i}"),
          Value::Float(n) => write!(f,"{n:?}"),
-         // Value::ShortStr(_, _) => todo!(),
-         // Value::MidStr(_) => todo!(),
-         // Value::LongStr(_) => todo!(),
+         Value::String(s) => write!(f, "{s}"),
+        //  Value::ShortStr(_, _) => todo!(),
+        //  Value::MidStr(_) => todo!(),
+        //  Value::LongStr(_) => todo!(),
       }
    }
 }
@@ -52,22 +52,50 @@ impl PartialEq for Value {
     }
 }
 
-// impl From<String> for Value {
-//    fn from(value: String) -> Self {
-//        let len = value.len();
-//        if len <= SHORT_STR_MAX{
-//             // len [0..14]
-//             let mut buf = [0;SHORT_STR_MAX];
-//             buf[..len].copy_from_slice(value.as_bytes());
-//             Value::ShortStr(len as u8,buf)
-//        }
-//        else if len <= MID_STR_MAX {
-//             let mut buf = [0;MID_STR_MAX];
-//             buf[..len].copy_from_slice(value.as_bytes());
-//             Value::MidStr(Rc::new((len as u8,buf)))
-//        }
-//        else {
-//             Value::LongStr(Rc::new(value.into())) 
-//        }
-//    } 
-// }
+impl From<String> for Value {
+   fn from(value: String) -> Self {
+      Value::String(value)
+      //  let len = value.len();
+      //  if len <= SHORT_STR_MAX{
+      //       // len [0..14]
+      //       let mut buf = [0;SHORT_STR_MAX];
+      //       buf[..len].copy_from_slice(value.as_bytes());
+      //       Value::ShortStr(len as u8,buf)
+      //  }
+      //  else if len <= MID_STR_MAX {
+      //       // len[15..47]
+      //       let mut buf = [0;MID_STR_MAX];
+      //       buf[..len].copy_from_slice(value.as_bytes());
+      //       Value::MidStr(Rc::new((len as u8,buf)))
+      //  }
+      //  else {
+      //       // len > 47
+      //       Value::LongStr(Rc::new(value.into())) 
+      //  }
+   } 
+}
+
+impl From<i64> for Value{
+  fn from(value: i64) -> Self {
+     Value::Integer(value) 
+  }
+}
+
+impl From<f64> for Value {
+  fn from(value: f64) -> Self {
+      Value::Float(value)
+  }
+}
+
+impl From<bool> for Value{
+  fn from(value: bool) -> Self {
+      Value::Boolean(value)
+  }
+}
+
+impl From<()> for Value {
+  fn from(_value: ()) -> Self {
+      Value::Nil
+  }
+}
+

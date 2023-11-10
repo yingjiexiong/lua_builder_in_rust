@@ -1,6 +1,6 @@
 use std::fs::File;
 
-use crate::{value::{Value, self}, byte_code::ByteCode, lex::{Lex, Token}};
+use crate::{value::Value, byte_code::ByteCode, lex::{Lex, Token}};
 
 
 
@@ -84,7 +84,7 @@ fn function_call(&mut self,
           }
       } 
       Token::Strng(s)=>{
-          let code = self.load_const(1,Value::String(s));
+          let code = self.load_const(1,s);
           self.byte_codes.push(code);
       }
 
@@ -98,19 +98,20 @@ fn function_call(&mut self,
 fn load_exp(&mut self, dst: usize) {
 
     let code = match self.lex.next() {
-       Token::Strng(s)=>self.load_const(dst, Value::String(s)),
+       Token::Nil => ByteCode::LoadNil(dst as u8),
+       Token::Strng(s)=>self.load_const(dst, s),
        Token::Name(var)=>self.load_var(dst,var),
        Token::Integer(i)=>{
           if let Ok(ii)=i16::try_from(i) {
             ByteCode::LoadInt(dst as u8, ii)
           }
           else{
-            self.load_const(dst, Value::Integer(i))
+            self.load_const(dst, i)
           }
        }
        Token::True=>ByteCode::LoadBool(dst as u8, true),
        Token::False=>ByteCode::LoadBool(dst as u8, false),
-       Token::Float(f)=>self.load_const(dst, Value::Float(f)),
+       Token::Float(f)=>self.load_const(dst, f),
        _=>panic!("invalid argument"),
     };
     self.byte_codes.push(code);
@@ -125,20 +126,22 @@ fn load_var(&mut self,
     }
     else {
       // global variable
-        let ic = self.add_const(Value::String(name));
+        let ic = self.add_const(name);
         ByteCode::GetGlobal(dst as u8, ic as u8)
     }
 }
 
-fn load_const(&mut self,arg: usize, i: Value) -> ByteCode {
-   ByteCode::LoadConst(arg as u8, self.add_const(i) as u8) 
+fn load_const<T:Into<Value>>(&mut self,arg: usize, i:T) -> ByteCode {
+   let i_t = i.into();
+   ByteCode::LoadConst(arg as u8, self.add_const(i_t) as u8) 
 }
 
-fn add_const(&mut self,name: Value) -> usize {
+fn add_const<T:Into<Value>>(&mut self,name: T) -> usize {
+    let name_t = name.into();
     self.constants.iter()
-             .position(|v| v == &name)
+             .position(|v| v == &name_t)
              .unwrap_or_else(||{
-                  self.constants.push(name);
+                  self.constants.push(name_t);
                   self.constants.len()-1
              })
 }
@@ -155,16 +158,16 @@ fn assignment(&mut self,
     }
     else {
       // global variable
-      let dst = self.add_const(value::Value::String(name)) as u8;
+      let dst = self.add_const(name) as u8;
 
       let code = match self.lex.next() {
           // from const values
-          Token::Nil=>ByteCode::SetGlobalConst(dst, self.add_const(Value::Nil) as u8),
-          Token::True=>ByteCode::SetGlobalConst(dst, self.add_const(Value::Boolean(true)) as u8),
-          Token::False=>ByteCode::SetGlobalConst(dst, self.add_const(Value::Boolean(false)) as u8),
-          Token::Integer(i)=>ByteCode::SetGlobalConst(dst, self.add_const(Value::Integer(i)) as u8),
-          Token::Float(f)=>ByteCode::SetGlobalConst(dst, self.add_const(Value::Float(f)) as u8),
-          Token::Strng(s)=>ByteCode::SetGlobalConst(dst, self.add_const(Value::String(s)) as u8),
+          Token::Nil=>ByteCode::SetGlobalConst(dst, self.add_const(()) as u8),
+          Token::True=>ByteCode::SetGlobalConst(dst, self.add_const(true) as u8),
+          Token::False=>ByteCode::SetGlobalConst(dst, self.add_const(false) as u8),
+          Token::Integer(i)=>ByteCode::SetGlobalConst(dst, self.add_const(i) as u8),
+          Token::Float(f)=>ByteCode::SetGlobalConst(dst, self.add_const(f) as u8),
+          Token::Strng(s)=>ByteCode::SetGlobalConst(dst, self.add_const(s) as u8),
           
           // from variable
           Token::Name(n)=>
@@ -172,7 +175,7 @@ fn assignment(&mut self,
                   ByteCode::SetGlobal(dst, i as u8)
               }
               else{
-                  ByteCode::SetGlobalConst(dst, self.add_const(Value::String(n)) as u8)
+                  ByteCode::SetGlobalGlobal(dst, self.add_const(n) as u8)
               }
 
           _=>panic!("invalid argument"),
