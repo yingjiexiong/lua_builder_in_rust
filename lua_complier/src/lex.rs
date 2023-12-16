@@ -1,8 +1,9 @@
-use std::{fs::File, io::{Read, Seek}, mem};
+use core::panic;
+use std::{io::{Read, Bytes}, mem, iter::Peekable, char};
 
 #[derive(Debug)]
-pub struct Lex{
-    input: File,
+pub struct Lex<R:Read>{
+    input: Peekable::<Bytes::<R>>,
     head:Token,
 }
 #[derive(Debug,PartialEq)]
@@ -27,15 +28,15 @@ pub enum Token {
     Integer(i64),
     Float(f64),
     Name(String),
-    Strng(String),
+    Strng(Vec<u8>),
     Eos,
 }
 
-impl Lex {
-   pub fn new(input : File) ->Self{
+impl<R:Read> Lex<R> {
+   pub fn new(input : R) ->Self{
         Lex {
-            input,
-            head:Token::Eos 
+            input:input.bytes().peekable(),
+            head:Token::Eos,
         } 
    }
    pub fn next(&mut self)->Token{
@@ -56,97 +57,100 @@ impl Lex {
    }
    fn do_next(&mut self)->Token {
 
-        let ch = self.read_char();
+        if let Some(ch) = self.next_byte(){
         match ch {
-           ' ' | '\r' | '\n' | '\t' => self.do_next(),
-           '+'=>Token::Add,
-           '*'=>Token::Mul,
-           '%'=>Token::Mod,
-           '^'=>Token::Pow,
-           '#'=>Token::Len,
-           '&'=>Token::BitAnd,
-           '|'=>Token::BitOr,
-           '('=>Token::ParL,
-           ')'=>Token::ParR,
-           '{'=>Token::CurlyL,
-           '}'=>Token::CurlyR,
-           '['=>Token::SqurL,
-           ']'=>Token::SqurR,
-           ';'=>Token::SemiColon,
-           ','=>Token::Comma,
-           '/'=>self.check_ahead('/', Token::Idiv, Token::Div),
-           '='=>self.check_ahead('/', Token::Equal, Token::Assign),
-           '~'=>self.check_ahead('=', Token::NotEq, Token::BitXor),
-           ':'=>self.check_ahead(':', Token::DoubColon, Token::Colon),
-           '<'=>self.check_ahead2('=', Token::LesEq, '<', Token::ShiftL, Token::Less),
-           '>'=>self.check_ahead2('=', Token::GreEq, '>', Token::ShiftR, Token::Greater),
-           '.'=>match self.read_char() {
-                '.'=>{
-                    if self.read_char() == '.'{
+           b' ' | b'\r' | b'\n' | b'\t' => self.do_next(),
+           b'+'=>Token::Add,
+           b'*'=>Token::Mul,
+           b'%'=>Token::Mod,
+           b'^'=>Token::Pow,
+           b'#'=>Token::Len,
+           b'&'=>Token::BitAnd,
+           b'|'=>Token::BitOr,
+           b'('=>Token::ParL,
+           b')'=>Token::ParR,
+           b'{'=>Token::CurlyL,
+           b'}'=>Token::CurlyR,
+           b'['=>Token::SqurL,
+           b']'=>Token::SqurR,
+           b';'=>Token::SemiColon,
+           b','=>Token::Comma,
+           b'/'=>self.check_ahead(b'/', Token::Idiv, Token::Div),
+           b'='=>self.check_ahead(b'/', Token::Equal, Token::Assign),
+           b'~'=>self.check_ahead(b'=', Token::NotEq, Token::BitXor),
+           b':'=>self.check_ahead(b':', Token::DoubColon, Token::Colon),
+           b'<'=>self.check_ahead2(b'=', Token::LesEq, b'<', Token::ShiftL, Token::Less),
+           b'>'=>self.check_ahead2(b'=', Token::GreEq, b'>', Token::ShiftR, Token::Greater),
+           b'.'=>match self.read_char() {
+                b'.'=>{
+                    self.next_byte();
+                    if self.read_char() == b'.'{
+                        self.next_byte();
                         Token::Dots
                     }
                     else {
-                        self.pullback_char();
                         Token::Concat
                     }
                 },
-                '0'..='9'=>{
-                    self.pullback_char();
+                b'0'..=b'9'=>{
                     self.read_digit_fraction(0)
                 },
                 _=>{
-                    self.pullback_char();
                     Token::Dot
                 },
            },
-           '-'=>{
-                if self.read_char() == '-'{
+           b'-'=>{
+                if self.read_char() == b'-'{
+                    self.next_byte();
                     self.read_comment();
                     self.do_next()
                 }
                 else {
-                    self.pullback_char();
                     Token::Sub
                 }
            },
-           '\''| '"' => self.read_string(ch),
-           'A'..='Z' | 'a'..='z' | '_'=>self.read_name(ch),
-           '0'..='9'=>self.read_number(ch),
-           '\0' => Token::Eos,
+           b'\''| b'"' => self.read_string(ch),
+           b'A'..=b'Z' | b'a'..=b'z' | b'_'=>self.read_name(ch),
+           b'0'..=b'9'=>self.read_number(ch),
+           b'\0' => Token::Eos,
            _ => panic!("unexpected char: {ch}"),
         }
+      }
+      else{
+        Token::Eos
+      }
 
    }
 
-   fn read_char(&mut self) -> char{
+   fn read_char(&mut self) -> u8{
 
-        let mut buf:[u8;1] = [0];
-        if self.input.read(&mut buf).unwrap() == 1{
-            buf[0] as char
-        }
-        else {
-            '\0'
-        }
+      match self.input.peek() {
+         Some(Ok(ch)) => *ch,
+         Some(_) =>panic!("lex read error"),
+         None => b'\0',
+      }
+
    }
 
-   fn pullback_char(&mut self){
-      self.input.seek(std::io::SeekFrom::Current(-1)).unwrap();
+   fn next_byte(&mut self)->Option<u8>{
+    self.input.next().and_then(|r|Some(r.unwrap()))
    }
 
-   fn read_name(&mut self,first:char)->Token{
-                
-        let mut s = first.to_string();
+   fn read_name(&mut self,first:u8)->Token{
+        let mut s = String::new(); 
+        s.push(first as char);
+
         loop {
-           match self.read_char() {
-            '\0'=>break,
-            '_' =>s.push('_'),
-            ch if ch.is_alphanumeric()=>s.push(ch),
-            _=>{
-              self.pullback_char();
-              break;
-            }
-           } 
+           let ch = self.read_char() as char;
+           if ch.is_alphanumeric() || ch == '_'{
+            self.next_byte();
+            s.push(ch);
+           }
+           else {
+               break;
+           }
         } 
+
         match &s as &str {
             "nil"=>Token::Nil,
             "true"=>Token::True,
@@ -174,38 +178,55 @@ impl Lex {
         }
 
    }
-   fn read_number(&mut self,first:char)->Token {
-      let mut num = first.to_digit(10).unwrap() as i64;
+   fn read_number(&mut self,first:u8)->Token {
+      let mut num = (first - b'0') as i64;
+
+      /*heximal */
+      if first == b'0'{
+        let second = self.read_char();
+        if second == b'x' || second == b'X'{
+          return self.read_heximal();
+        }
+      }
 
       /*decima */
       loop {
          let ch = self.read_char();
-         if let Some(num1) = ch.to_digit(10){
+         if let Some(num1) = char::to_digit(ch as char, 10){
+            self.next_byte();
             num = num * 10 + num1 as i64;
          }
-         else if ch == '.'{
+         else if ch == b'.'{
           return self.read_digit_fraction(num); 
          }
+         else if ch == b'e' || ch == b'E'{
+          return self.read_number_exp(ch as f64);
+         }
          else{
-          self.pullback_char();
           break;
          }
       } 
+
+      let fcn = self.read_char();
+      if(fcn as char).is_alphabetic() || fcn == b'.'{
+        panic!("malformat number")
+      }
 
       Token::Integer(num)
    }
 
    fn read_digit_fraction(&mut self,n:i64)->Token{
+      self.next_byte();
       let mut num_i:i64 = 0;
       let mut x = 1.0;
       loop {
         let ch = self.read_char();
-        if let Some(num1) = ch.to_digit(10){
+        if let Some(num1) = char::to_digit(ch as char,10){
+          self.next_byte();
           num_i = num_i * 10 + num1 as i64; 
           x *=  10.0;
         }      
         else{
-          self.pullback_char();
           break;
         }
 
@@ -217,13 +238,13 @@ impl Lex {
       Token::Float(n as f64 + num_f)
    }
 
-   fn read_string(&mut self,quote:char)->Token{
+   fn read_string(&mut self,quote:u8)->Token{
 
-    let mut s = String::new();
+    let mut s = Vec::new();
     loop {
-        match self.read_char() {
-            '\n' | '\0' => panic!("unfinished string") ,
-            '\\'=>todo!("escape"),
+        match self.next_byte().expect("infinished string") {
+            b'\n' | b'\0' => panic!("unfinished string") ,
+            b'\\'=>todo!("escape"),
             ch if ch == quote => break,
             ch => s.push(ch),
         }    
@@ -231,43 +252,57 @@ impl Lex {
     Token::Strng(s)
    }
 
-   fn check_ahead(&mut self,ch:char,short:Token,long:Token)->Token {
+   fn check_ahead(&mut self,ch:u8,short:Token,long:Token)->Token {
 
            if self.read_char() == ch{
-                short 
+                // short 
+                self.next_byte();
+                short
            } 
            else {
-                self.pullback_char();
+                // self.pullback_char();
                 long 
            }
    }
 
-   fn check_ahead2(&mut self,ch:char,short1:Token,ch1:char,short2:Token,long:Token)->Token{
+   fn check_ahead2(&mut self,ch:u8,short1:Token,ch1:u8,short2:Token,long:Token)->Token{
 
             let t = self.read_char();
             if t == ch{
+                self.next_byte();
                 short1
             }
             else if t == ch1{
-               short2 
+                self.next_byte();
+                short2 
             }
             else {
-                self.pullback_char();
+                // self.pullback_char();
                 long
             }
    }
 
    fn read_comment(&mut self){
     match self.read_char() {
-       '['=>todo!("long comment"),
+       b'['=>todo!("long comment"),
        _=>{
             loop {
                 let ch = self.read_char();
-                if ch == '\n' || ch == '\0'{
+                if ch == b'\n' || ch == b'\0'{
                     break;
                 }
             }
        }
     }
+   }
+
+   fn read_number_exp(&mut self,_:f64)->Token{
+    self.next_byte();
+    todo!("lex number exp")
+   }
+
+   fn read_heximal(&mut self)->Token{
+    self.next_byte();
+    todo!("lex number heximal")
    }
 }
